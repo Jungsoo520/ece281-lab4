@@ -25,7 +25,15 @@ end top_basys3;
 architecture top_basys3_arch of top_basys3 is
 
     -- signal declarations
+    signal slow_clk      : std_logic;
+    signal tdm_clk       : std_logic;
+    signal clk_reset     : std_logic;
+    signal fsm_reset     : std_logic;
+    signal floor_sig     : std_logic_vector(3 downto 0);
+    signal floor2_sig : std_logic_vector(3 downto 0);
+    signal tdm_data   : std_logic_vector(3 downto 0);
     
+    constant k_F : std_logic_vector(3 downto 0) := x"F";
   
 	-- component declarations
     component sevenseg_decoder is
@@ -37,11 +45,11 @@ architecture top_basys3_arch of top_basys3 is
     
     component elevator_controller_fsm is
 		Port (
-            i_clk        : in  STD_LOGIC;
-            i_reset      : in  STD_LOGIC;
-            is_stopped   : in  STD_LOGIC;
-            go_up_down   : in  STD_LOGIC;
-            o_floor : out STD_LOGIC_VECTOR (3 downto 0)		   
+            i_clk      : in  std_logic;
+            i_reset    : in  std_logic;
+            is_stopped     : in  std_logic;
+            go_up_down  : in  std_logic;
+            o_floor    : out std_logic_vector(3 downto 0)		   
 		 );
 	end component elevator_controller_fsm;
 	
@@ -70,14 +78,65 @@ architecture top_basys3_arch of top_basys3 is
 	
 begin
 	-- PORT MAPS ----------------------------------------
+    	clk_reset <= btnL or btnU;
+    	fsm_reset <= btnR or btnU;
     	
-	
+    	clk_div_inst : clock_divider
+            generic map (
+                k_DIV => 25000000
+            )
+            port map (
+                i_clk   => clk,
+                i_reset => clk_reset,
+                o_clk   => slow_clk
+            );
+       clk_div2_inst : clock_divider
+            generic map (
+                k_DIV => 50000
+            )
+            port map (
+                i_clk   => clk,
+                i_reset => '0',
+                o_clk   => tdm_clk
+            );
+       sevenseg_inst : sevenseg_decoder
+            port map (
+                i_Hex   => tdm_data,
+                o_seg_n => seg
+            );    
+	   fsm_inst : elevator_controller_fsm
+            port map (
+                i_clk       => slow_clk,
+                i_reset     => fsm_reset,
+                is_stopped  => sw(0),
+                go_up_down  => sw(1),
+                o_floor     => floor_sig
+            );
+       fsm2_inst : elevator_controller_fsm
+            port map (
+                i_clk       => slow_clk,
+                i_reset     => fsm_reset,
+                is_stopped  => sw(14),
+                go_up_down  => sw(15),
+                o_floor     => floor2_sig
+            );
+       tdm_inst : TDM4
+            port map (
+                i_clk   => tdm_clk,
+                i_reset => '0',
+                i_D3    => k_F,
+                i_D2    => floor2_sig,
+                i_D1    => k_F,
+                i_D0    => floor_sig,
+                o_data  => tdm_data,
+                o_sel   => an
+            );
+       
 	-- CONCURRENT STATEMENTS ----------------------------
-	
 	-- LED 15 gets the FSM slow clock signal. The rest are grounded.
-	
+    led(15) <= slow_clk;
+    led(14 downto 0) <= (others => '0');
 	-- leave unused switches UNCONNECTED. Ignore any warnings this causes.
-	
-	-- reset signals
-	
+
+    
 end top_basys3_arch;

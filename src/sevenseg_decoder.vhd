@@ -73,4 +73,5 @@ begin
     o_seg_n(6) <= not w_seg(0); -- Sg
 
 
+
 end Behavioral;
